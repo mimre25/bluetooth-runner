@@ -6,7 +6,7 @@ import logging
 import dbus
 import dbus.service
 import dbus.mainloop.glib
-import gobject
+from gi.repository import GObject
 import subprocess
 import time
 
@@ -16,25 +16,44 @@ LOG_FILE = "/dev/stdout"
 #LOG_FILE = "/var/log/syslog"
 LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
 
-def device_property_changed_cb(property_name, value, path, interface):
-    device = dbus.Interface(bus.get_object("org.bluez", path), "org.bluez.Device")
-    properties = device.GetProperties()
+PATH = "/org/bluez/hci0/dev_"
+SPEAKERS = f"{PATH}00_00_00_00_03_C2"
+HEADSET = f"{PATH}E8_AB_FA_37_DE_E9"
 
-    if (property_name == "Connected"):
-        action = "connected" if value else "disconnected"
-        print("The device %s [%s] is %s " % (properties["Alias"],
-              properties["Address"], action))
-        if action == "connected":
-            print("sleeping")
-            time.sleep(3)
-            subprocess.call(['xinput', 'set-prop',
-                             'ThinkPad Compact Bluetooth Keyboard with TrackPoint',
-                             'Device Accel Constant Deceleration', '0.5'])
-            subprocess.call(['xinput', 'set-button-map',
-                             'ThinkPad Compact Bluetooth Keyboard with TrackPoint',
-                             '1 18 3 4 5 6 7'])
-            print("command executed")
 
+def device_property_changed_cb(property_name, *args, path, **kwargs):
+    dicts = [x for x in args if type(x) == dbus.Dictionary]
+    if not dicts:
+        return
+
+    if "bluez" not in property_name:
+        return
+
+    dic = dicts[0]
+    connected = dic.get("Connected")
+    logging.info(f"prop change: {property_name}, dict {dic}, connected {connected}")
+    if connected is not None:
+        logging.info(f"path: {path}")
+        action = "connected" if connected else "disconnected"
+        print(f"bluetooth {action}")
+        if path == HEADSET:
+            bus = dbus.SystemBus()
+            speakers = bus.get_object("org.bluez", "/org/bluez/hci0/dev_00_00_00_00_03_C2")
+            prop_iface = dbus.Interface(speakers, "org.freedesktop.DBus.Properties")
+
+            if action == "connected":
+                if prop_iface.Get("org.bluez.Device1", "Connected"):
+                    dev_if = dbus.Interface(speakers, "org.bluez.Device1")
+                    dev_if.Disconnect()
+                    logging.info("Speakers disconnected")
+
+            if action == "disconnected":
+                if not prop_iface.Get("org.bluez.Device1", "Connected"):
+                    dev_if = dbus.Interface(speakers, "org.bluez.Device1")
+                    dev_if.Connect()
+                    logging.info("Speakers re-connected")
+        else:
+            print(path, HEADSET)
 
 def shutdown(signum, frame):
     mainloop.quit()
@@ -58,16 +77,17 @@ if __name__ == "__main__":
 
     # listen for signals on the Bluez bus
     bus.add_signal_receiver(device_property_changed_cb, bus_name="org.bluez",
-                            signal_name="PropertyChanged",
-                            dbus_interface="org.bluez.Device",
+                            signal_name=None,
+                            dbus_interface=None,
                             path_keyword="path", interface_keyword="interface")
     try:
-        mainloop = gobject.MainLoop()
+        mainloop = GObject.MainLoop()
         mainloop.run()
     except KeyboardInterrupt:
         pass
-    except:
+    except Exception as e:
         logging.error("Unable to run the gobject main loop")
+        logging.error(e)
 
     logging.info("Shutting down bluetooth-runner")
     sys.exit(0)
