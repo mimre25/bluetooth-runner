@@ -1,6 +1,6 @@
 # bluetooth-runner
 
-Forked from yxlao/bluetooth-runner](https://github.com/yxlao/bluetooth-runner).
+Forked from [yxlao/bluetooth-runner](https://github.com/yxlao/bluetooth-runner).
 
 Solution to my post [here](https://askubuntu.com/questions/1310391/second-connected-bluetooth-speaker-always-in-hsp-profile)
 
