@@ -19,6 +19,9 @@ LOG_FORMAT = "%(asctime)s %(levelname)s %(message)s"
 PATH = "/org/bluez/hci0/dev_"
 SPEAKERS = f"{PATH}00_00_00_00_03_C2"
 HEADSET = f"{PATH}E8_AB_FA_37_DE_E9"
+EAR_BUDS = f"{PATH}AC_12_2F_50_43_F9"
+
+SWITCH_TO = {HEADSET, EAR_BUDS }
 
 
 def device_property_changed_cb(property_name, *args, path, **kwargs):
@@ -36,7 +39,7 @@ def device_property_changed_cb(property_name, *args, path, **kwargs):
         logging.info(f"path: {path}")
         action = "connected" if connected else "disconnected"
         print(f"bluetooth {action}")
-        if path == HEADSET:
+        if path in SWITCH_TO:
             bus = dbus.SystemBus()
             speakers = bus.get_object("org.bluez", "/org/bluez/hci0/dev_00_00_00_00_03_C2")
             prop_iface = dbus.Interface(speakers, "org.freedesktop.DBus.Properties")
